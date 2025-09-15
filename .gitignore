@@ -19,3 +19,5 @@ pybooksim2/pybooksim2.c
 pybooksim2/pybooksim2.cpp
 pybooksim2/*.so
 pybooksim2/*.html
+
+build
