@@ -30,6 +30,8 @@ int gNodes;
 bool gPrintActivity;
 bool gTrace;
 
+InterconnectWrapper *gWrapper = NULL;
+
 std::ostream * gWatchOut;
 std::unique_ptr<std::ofstream> gWatchOutFileStream;
 
@@ -80,13 +82,12 @@ void pybooksim2_destroy_config(void *config) {
 
 
 void *pybooksim2_create_icnt(void *config, char print_activity, char print_trace, char *output_file) {
-    if (gTrafficManager != NULL) {
-        cerr << "Error: An interconnect instance already exists. Destroy it before creating a new one." << endl;
-        return NULL;
+    if (gWrapper != NULL) {
+        pybooksim2_destroy_icnt((void *)gWrapper);
     }
 
-    InterconnectWrapper *icnt = new InterconnectWrapper(static_cast<BookSimConfig *>(config));
-    gTrafficManager = icnt->get_traffic_manager();
+    gWrapper = new InterconnectWrapper(static_cast<BookSimConfig *>(config));
+    gTrafficManager = gWrapper->get_traffic_manager();
 
     gPrintActivity = print_activity;
     gTrace = print_trace;
@@ -109,7 +110,7 @@ void *pybooksim2_create_icnt(void *config, char print_activity, char print_trace
         gWatchOut = NULL;
     }
 
-    return icnt;
+    return (void *)gWrapper;
 }
 
 void  pybooksim2_destroy_icnt(void *icnt_p) {
