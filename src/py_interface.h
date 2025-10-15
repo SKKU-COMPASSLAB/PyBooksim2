@@ -6,10 +6,12 @@
 #include <memory>
 #include "globals.hpp"
 
-// #pragma once
-// #ifdef __cplusplus
-// extern "C" {
-// #endif
+
+#ifndef __CALLBACK_T_DEFINED
+#define __CALLBACK_T_DEFINED
+typedef void (* callback_t)(void *cmd_p);
+#endif
+
 
 void *pybooksim2_create_config_from_file(char *config_file);
 void *pybooksim2_create_config_torus_2d(int subnets, int x, int y, int xr, int yr);
@@ -27,16 +29,9 @@ void  pybooksim2_destroy_icnt_cmd(void *cmd_p);
 
 char  pybooksim2_check_icnt_cmd_received(void *cmd_p);
 int   pybooksim2_get_expected_cmd_cycles(void *cmd_p);
-// char  pybooksim2_check_icnt_cmd_handled(void *cmd_p);
-// char  pybooksim2_check_icnt_node_busy(void *icnt_p, int node_id);
 
-char  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p);
-// char  pybooksim2_icnt_handle_cmd(void *icnt_p, void *cmd_p);
+char  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p, callback_t dispatch_callback, callback_t execute_callback);
 void  pybooksim2_icnt_cycle_step(void *icnt_p);
 
-
-// #ifdef __cplusplus
-// }
-// #endif
 
 #endif

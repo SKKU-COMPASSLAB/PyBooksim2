@@ -2,7 +2,10 @@
 import cython
 from cpython.bytes cimport PyBytes_AsString
 from cpython.pycapsule cimport PyCapsule_New, PyCapsule_GetPointer, PyCapsule_Destructor
+from cpython.long cimport PyLong_FromVoidPtr
 from ._pybooksim2 cimport (
+    callback_t,
+
     GetSimTime,
 
     pybooksim2_create_config_from_file,
@@ -21,13 +24,34 @@ from ._pybooksim2 cimport (
 
     pybooksim2_check_icnt_cmd_received,
     pybooksim2_get_expected_cmd_cycles,
-    # pybooksim2_check_icnt_cmd_handled,
-    # pybooksim2_check_icnt_node_busy,
 
     pybooksim2_icnt_dispatch_cmd,
-    # pybooksim2_icnt_handle_cmd,
     pybooksim2_icnt_cycle_step
 )
+
+
+command_callback_container = {}
+
+cdef command_callback_wrapper(void *cmd_p):
+    global command_callback_container
+
+    cap_id = PyLong_FromVoidPtr(cmd_p)
+    if cap_id in command_callback_container:
+        py_callback, cap = command_callback_container[cap_id]
+        py_callback(cap)
+        del command_callback_container[cap_id]
+
+
+dispatch_callback_container = {}
+
+cdef dispatch_callback_wrapper(void *cmd_p):
+    global dispatch_callback_container
+
+    cap_id = PyLong_FromVoidPtr(cmd_p)
+    if cap_id in dispatch_callback_container:
+        py_callback, cap = dispatch_callback_container[cap_id]
+        py_callback(cap)
+        del dispatch_callback_container[cap_id]
 
 
 @cython.boundscheck(False)
@@ -51,9 +75,15 @@ cdef void config_capsule_destructor(capsule) except *:
         pybooksim2_destroy_config(p)
 
 cdef void cmd_capsule_destructor(capsule) except *:
+    global command_callback_container
     cdef void* p = PyCapsule_GetPointer(capsule, CMD_CAPSULE_NAME)
+    cap_id = PyLong_FromVoidPtr(p)
     if p != NULL:
         pybooksim2_destroy_icnt_cmd(p)
+        if cap_id in command_callback_container:
+            del command_callback_container[cap_id]
+        if cap_id in dispatch_callback_container:
+            del dispatch_callback_container[cap_id]
 
 
 @cython.boundscheck(False)
@@ -112,6 +142,7 @@ def create_icnt(config, bint print_activity=0, bint print_trace=0, output_file=N
 def create_icnt_cmd_data_packet(int src_id, int dst_id, int subnet, int size, bint is_write, bint is_response):
     cdef void *cmd_p = pybooksim2_create_icnt_cmd_data_packet(src_id, dst_id, subnet, size, is_write, is_response)
     cap = PyCapsule_New(cmd_p, CMD_CAPSULE_NAME, <PyCapsule_Destructor> cmd_capsule_destructor)
+
     return cap
 
 @cython.boundscheck(False)
@@ -119,6 +150,7 @@ def create_icnt_cmd_data_packet(int src_id, int dst_id, int subnet, int size, bi
 def create_icnt_cmd_control_packet(int src_id, int dst_id, int subnet, int size, bint is_response):
     cdef void *cmd_p = pybooksim2_create_icnt_cmd_control_packet(src_id, dst_id, subnet, size, is_response)
     cap = PyCapsule_New(cmd_p, CMD_CAPSULE_NAME, <PyCapsule_Destructor> cmd_capsule_destructor)
+
     return cap
 
 
@@ -136,36 +168,21 @@ def get_expected_cmd_cycles(cmd):
     cdef int cycles = pybooksim2_get_expected_cmd_cycles(cmd_p)
     return cycles
 
-# @cython.boundscheck(False)
-# @cython.wraparound(False)
-# def check_icnt_cmd_handled(cmd):
-#     cdef void *cmd_p = PyCapsule_GetPointer(cmd, CMD_CAPSULE_NAME)
-#     cdef bint flag = pybooksim2_check_icnt_cmd_handled(cmd_p)
-#     return flag
-
-# @cython.boundscheck(False)
-# @cython.wraparound(False)
-# def check_icnt_node_busy(icnt, int node_id):
-#     cdef void *icnt_p = PyCapsule_GetPointer(icnt, ICNT_CAPSULE_NAME)
-#     cdef bint flag = pybooksim2_check_icnt_node_busy(icnt_p, node_id)
-#     return flag
-
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def icnt_dispatch_cmd(icnt, cmd):
+def icnt_dispatch_cmd(icnt, cmd, dispatch_callback, execute_callback):
+    global dispatch_callback_container
+    global command_callback_container
+
     cdef void *icnt_p = PyCapsule_GetPointer(icnt, ICNT_CAPSULE_NAME)
     cdef void *cmd_p = PyCapsule_GetPointer(cmd, CMD_CAPSULE_NAME)
-    cdef bint flag = pybooksim2_icnt_dispatch_cmd(icnt_p, cmd_p)
-    return flag
+    
+    dispatch_callback_container[PyLong_FromVoidPtr(cmd_p)] = (dispatch_callback, cmd)
+    command_callback_container[PyLong_FromVoidPtr(cmd_p)] = (execute_callback, cmd)
 
-# @cython.boundscheck(False)
-# @cython.wraparound(False)
-# def icnt_handle_cmd(icnt, cmd):
-#     cdef void *icnt_p = PyCapsule_GetPointer(icnt, ICNT_CAPSULE_NAME)
-#     cdef void *cmd_p = PyCapsule_GetPointer(cmd, CMD_CAPSULE_NAME)
-#     cdef bint flag = pybooksim2_icnt_handle_cmd(icnt_p, cmd_p)
-#     return flag
+    cdef bint flag = pybooksim2_icnt_dispatch_cmd(icnt_p, cmd_p, <callback_t>dispatch_callback_wrapper, <callback_t>command_callback_wrapper)
+    
+    return flag
 
 @cython.boundscheck(False)
 @cython.wraparound(False)

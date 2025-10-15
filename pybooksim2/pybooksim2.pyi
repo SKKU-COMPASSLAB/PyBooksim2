@@ -1,4 +1,5 @@
 from ctypes import c_void_p
+from typing import Callable
 
 
 __all__ = [
@@ -15,11 +16,8 @@ __all__ = [
     
     "check_icnt_cmd_received",
     "get_expected_cmd_cycles",
-    # "check_icnt_cmd_handled",
-    # "check_icnt_node_busy",
     
     "icnt_dispatch_cmd",
-    # "icnt_handle_cmd",
     "icnt_cycle_step",
 ]
 
@@ -36,9 +34,6 @@ def create_icnt_cmd_control_packet(src_id: int, dst_id: int, subnet: int, size: 
 
 def check_icnt_cmd_received(cmd: c_void_p) -> bool: ...
 def get_expected_cmd_cycles(cmd: c_void_p) -> int: ...
-# def check_icnt_cmd_handled(cmd: c_void_p) -> bool: ...
-# def check_icnt_node_busy(icnt: c_void_p, node_id: int) -> bool: ...
 
-def icnt_dispatch_cmd(icnt: c_void_p, cmd: c_void_p) -> bool: ...
-# def icnt_handle_cmd(icnt: c_void_p, cmd: c_void_p) -> bool: ...
+def icnt_dispatch_cmd(icnt: c_void_p, cmd: c_void_p, dispatch_callback: Callable=None, execute_callback: Callable=None) -> bool: ...
 def icnt_cycle_step(icnt: c_void_p, cycles: int) -> None: ...

@@ -131,6 +131,9 @@ void *pybooksim2_create_icnt_cmd_data_packet(int src_id, int dst_id, int subnet,
     cmd->is_received = false;
     cmd->is_handled = false;
 
+    cmd->dispatch_callback = NULL;
+    cmd->execute_callback = NULL;
+
     return cmd;
 }
 
@@ -146,6 +149,9 @@ void *pybooksim2_create_icnt_cmd_control_packet(int src_id, int dst_id, int subn
     
     cmd->is_received = false;
     cmd->is_handled = false;
+
+    cmd->dispatch_callback = NULL;
+    cmd->execute_callback = NULL;
 
     return cmd;
 }
@@ -173,28 +179,16 @@ int   pybooksim2_get_expected_cmd_cycles(void *cmd_p) {
     return expected_cycles;
 }
 
-// char  pybooksim2_check_icnt_cmd_handled(void *cmd_p) {
-//     InterconnectCommand *cmd = static_cast<InterconnectCommand *>(cmd_p);
-//     return cmd->is_handled;
-// }
 
-// char  pybooksim2_check_icnt_node_busy(void *icnt_p, int node_id) {
-//     InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);
-//     return icnt->is_node_busy(node_id);
-// }
-
-
-char  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p) {
+char  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p, callback_t dispatch_callback, callback_t execute_callback) {
     InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);
     InterconnectCommand *cmd = static_cast<InterconnectCommand *>(cmd_p);
+
+    cmd->dispatch_callback = dispatch_callback;
+    cmd->execute_callback = execute_callback;
+
     return icnt->dispatch_command(cmd);
 }
-
-// bool  pybooksim2_icnt_handle_cmd(void *icnt_p, void *cmd_p) {
-//     InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);
-//     InterconnectCommand *cmd = static_cast<InterconnectCommand *>(cmd_p);
-//     return icnt->handle_received_command(cmd);
-// }
 
 void  pybooksim2_icnt_cycle_step(void *icnt_p) {
     InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);

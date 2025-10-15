@@ -18,7 +18,7 @@ int main(int argc, char **argv) {
 
     int i, j;
 
-    pybooksim2_icnt_dispatch_cmd(icnt, cmd);
+    pybooksim2_icnt_dispatch_cmd(icnt, cmd, NULL, NULL);
 
     for (i = 0; i < 1000; i++) {
         pybooksim2_icnt_cycle_step(icnt);

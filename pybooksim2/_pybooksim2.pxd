@@ -1,4 +1,6 @@
 cdef extern from "py_interface.h":
+    ctypedef void (* callback_t)(void *cmd_p)
+
     int   GetSimTime() nogil
 
     void *pybooksim2_create_config_from_file(char *config_file) nogil
@@ -17,9 +19,6 @@ cdef extern from "py_interface.h":
 
     bint  pybooksim2_check_icnt_cmd_received(void *cmd_p) nogil
     int   pybooksim2_get_expected_cmd_cycles(void *cmd_p) nogil
-    # bint  pybooksim2_check_icnt_cmd_handled(void *cmd_p) nogil
-    # bint  pybooksim2_check_icnt_node_busy(void *icnt_p, int node_id) nogil
 
-    bint  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p) nogil
-    # bint  pybooksim2_icnt_handle_cmd(void *icnt_p, void *cmd_p) nogil
+    bint  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p, callback_t dispatch_callback, callback_t execute_callback) nogil
     void  pybooksim2_icnt_cycle_step(void *icnt_p) nogil

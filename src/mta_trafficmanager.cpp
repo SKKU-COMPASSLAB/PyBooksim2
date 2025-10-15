@@ -259,11 +259,11 @@ void MTATrafficManager::_Step()
     {
         for (int n = 0; n < _nodes; ++n)
         {
-            if (_tfm_if->IsNodeBusy(n))
-                continue;  // skip currently busy node -> wait until the current packet is handled via the TFM IF
-
             Flit * const f = _net[subnet]->ReadFlit( n );
             Credit *const c = _net[subnet]->ReadCredit(n);
+
+            if (_tfm_if->IsNodeBusy(n, subnet))
+                continue;  // skip currently busy node -> wait until the current packet is handled via the TFM IF
 
             if (f) {    // Processing the flit from the network 
                 flits[subnet].insert(make_pair(n, f));
@@ -271,7 +271,7 @@ void MTATrafficManager::_Step()
                         ++_accepted_flits[f->cl][n];
                     if(f->tail) {   // if the given flit is a tail, alert the TFM IF to make sure that the packet is handled by the external module via the IF
                         ++_accepted_packets[f->cl][n];
-                        _tfm_if->ReceivePacket(n, f->pid);
+                        _tfm_if->ReceivePacket(n, f->pid, subnet);
                     }
                 }
             }
@@ -369,65 +369,79 @@ void MTATrafficManager::_Step()
                         assert(vc_start <= vc_end);
                     }
 
+                    // for (int i = 1; i <= vc_count; ++i)
+                    // {
+                    //     int const lvc = _last_vc[n][subnet][c];
+                    //     int const vc =
+                    //         (lvc < vc_start || lvc > vc_end) ? vc_start : (vc_start + (lvc - vc_start + i) % vc_count);
+                    //     assert((vc >= vc_start) && (vc <= vc_end));
+                    //     if (!dest_buf->IsAvailableFor(vc))
+                    //     {
+                    //         if(cf->watch) {
+                    //             *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                    //                        << "  Output VC " << vc << " is busy." << endl;
+                    //         }
+                    //     }
+                    //     else
+                    //     {
+                    //         if (dest_buf->IsFullFor(vc))
+                    //         {
+                    //             if(cf->watch) {
+                    //                 *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                    //                            << "  Output VC " << vc << " is full." << endl;
+                    //             }
+                    //         }
+                    //         else
+                    //         {
+                    //             if(cf->watch) {
+                    //                 *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                    //                            << "  Selected output VC " << vc << "." << endl;
+                    //             }
+                    //             cf->vc = vc;
+                    //             break;
+                    //         }
+                    //     }
+                    // }
                     for (int i = 1; i <= vc_count; ++i)
                     {
                         int const lvc = _last_vc[n][subnet][c];
                         int const vc =
                             (lvc < vc_start || lvc > vc_end) ? vc_start : (vc_start + (lvc - vc_start + i) % vc_count);
                         assert((vc >= vc_start) && (vc <= vc_end));
-                        if (!dest_buf->IsAvailableFor(vc))
+                        if (dest_buf->IsAvailableFor(vc) && !dest_buf->IsFullFor(vc))
                         {
-                            if(cf->watch) {
-                                *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                                           << "  Output VC " << vc << " is busy." << endl;
-                            }
-                        }
-                        else
-                        {
-                            if (dest_buf->IsFullFor(vc))
-                            {
-                                if(cf->watch) {
-                                    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                                               << "  Output VC " << vc << " is full." << endl;
-                                }
-                            }
-                            else
-                            {
-                                if(cf->watch) {
-                                    *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                                               << "  Selected output VC " << vc << "." << endl;
-                                }
-                                cf->vc = vc;
-                                break;
-                            }
+                            cf->vc = vc;
+                            break;
                         }
                     }
                 }
 
-                if (cf->vc == -1)
-                {
-                    if(cf->watch) {
-                        *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                                   << "No output VC found for flit " << cf->id
-                                   << "." << endl;
-                    }
-                }
-                else
-                {
-                    if (dest_buf->IsFullFor(cf->vc))
-                    {
-                        if(cf->watch) {
-                            *gWatchOut << GetSimTime() << " | " << FullName() << " | "
-                                       << "Selected output VC " << cf->vc
-                                       << " is full for flit " << cf->id
-                                       << "." << endl;
-                        }
-                    }
-                    else
-                    {
-                        f = cf;
-                    }
-                }
+                // if (cf->vc == -1)
+                // {
+                //     if(cf->watch) {
+                //         *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                //                    << "No output VC found for flit " << cf->id
+                //                    << "." << endl;
+                //     }
+                // }
+                // else
+                // {
+                //     if (dest_buf->IsFullFor(cf->vc))
+                //     {
+                //         if(cf->watch) {
+                //             *gWatchOut << GetSimTime() << " | " << FullName() << " | "
+                //                        << "Selected output VC " << cf->vc
+                //                        << " is full for flit " << cf->id
+                //                        << "." << endl;
+                //         }
+                //     }
+                //     else
+                //     {
+                //         f = cf;
+                //     }
+                // }
+                if (cf->vc != -1 && !dest_buf->IsFullFor(cf->vc))
+                    f = cf;
             }
 
             if (f)
@@ -449,18 +463,19 @@ void MTATrafficManager::_Step()
                             assert(router);
                             int in_channel = inject->GetSinkPort();
                             _rf(router, f, in_channel, &f->la_route_set, false);
-                            if(f->watch) {
-                                *gWatchOut << GetSimTime() << " | "
-                                           << "node" << n << " | "
-                                           << "Generating lookahead routing info for flit " << f->id
-                                           << "." << endl;
-                            }
-                        } else if(f->watch) {
-                            *gWatchOut << GetSimTime() << " | "
-                                       << "node" << n << " | "
-                                       << "Already generated lookahead routing info for flit " << f->id
-                                       << " (NOQ)." << endl;
-                        }
+                            // if(f->watch) {
+                            //     *gWatchOut << GetSimTime() << " | "
+                            //                << "node" << n << " | "
+                            //                << "Generating lookahead routing info for flit " << f->id
+                            //                << "." << endl;
+                            // }
+                        } 
+                        // else if(f->watch) {
+                        //     *gWatchOut << GetSimTime() << " | "
+                        //                << "node" << n << " | "
+                        //                << "Already generated lookahead routing info for flit " << f->id
+                        //                << " (NOQ)." << endl;
+                        // }
                     } else {
                         f->la_route_set.Clear();
                     }
@@ -486,15 +501,15 @@ void MTATrafficManager::_Step()
                     assert(f->pri >= 0);
                 }
 
-                if(f->watch) {
-                    *gWatchOut << GetSimTime() << " | "
-                               << "node" << n << " | "
-                               << "Injecting flit " << f->id
-                               << " into subnet " << subnet
-                               << " at time " << _time
-                               << " with priority " << f->pri
-                               << "." << endl;
-                }
+                // if(f->watch) {
+                //     *gWatchOut << GetSimTime() << " | "
+                //                << "node" << n << " | "
+                //                << "Injecting flit " << f->id
+                //                << " into subnet " << subnet
+                //                << " at time " << _time
+                //                << " with priority " << f->pri
+                //                << "." << endl;
+                // }
                 f->itime = _time;
 
                 // Pass VC "back"
@@ -532,13 +547,13 @@ void MTATrafficManager::_Step()
                 Flit *const f = iter->second;
 
                 f->atime = _time;
-                if(f->watch) {
-                    *gWatchOut << GetSimTime() << " | "
-                               << "node" << n << " | "
-                               << "Injecting credit for VC " << f->vc 
-                               << " into subnet " << subnet 
-                               << "." << endl;
-                }
+                // if(f->watch) {
+                //     *gWatchOut << GetSimTime() << " | "
+                //                << "node" << n << " | "
+                //                << "Injecting credit for VC " << f->vc 
+                //                << " into subnet " << subnet 
+                //                << "." << endl;
+                // }
 
                 Credit *const c = Credit::New();
                 c->vc.insert(f->vc);
@@ -559,9 +574,9 @@ void MTATrafficManager::_Step()
 
     ++_time;
     assert(_time);
-    if(gTrace){
-        cout<<"TIME "<<_time<<endl;
-    }
+    // if(gTrace){
+    //     cout<<"TIME "<<_time<<endl;
+    // }
 }
 
 
@@ -641,7 +656,7 @@ MTATrafficManagerInterface::MTATrafficManagerInterface(const Configuration &conf
 {
     _traffic_manager_p = new MTATrafficManager(config, net, this);
     _unhandled_packets = vector<map<int, MTAPacketDescriptor>>(_traffic_manager_p->_nodes);
-    _ongoing_packet_ids = vector<int>(_traffic_manager_p->_nodes, -1);
+    _ongoing_packet_ids = vector<vector<int>>(_traffic_manager_p->_nodes, vector<int>(_traffic_manager_p->_subnets, -1));
 }
 
 MTATrafficManagerInterface::~MTATrafficManagerInterface() {
@@ -658,30 +673,30 @@ int  MTATrafficManagerInterface::SendPacket(const int src_id, const int dst_id, 
     return pid;
 }
 
-void MTATrafficManagerInterface::ReceivePacket(const int dst_id, const int pid) {
-    _ongoing_packet_ids[dst_id] = pid;
+void MTATrafficManagerInterface::ReceivePacket(const int dst_id, const int pid, const int subnet) {
+    _ongoing_packet_ids[dst_id][subnet] = pid;
 }
 
-void MTATrafficManagerInterface::HandlePacket(const int node_id) {
-    const int pid = GetPID(node_id);
+void MTATrafficManagerInterface::HandlePacket(const int node_id, const int subnet) {
+    const int pid = GetPID(node_id, subnet);
     
     if (pid != -1) {
         _unhandled_packets[node_id].erase(pid);
-        _ongoing_packet_ids[node_id] = -1;
+        _ongoing_packet_ids[node_id][subnet] = -1;
     }
 }
 
-int  MTATrafficManagerInterface::GetPID(const int node_id) const {
-    return _ongoing_packet_ids[node_id];
+int  MTATrafficManagerInterface::GetPID(const int node_id, const int subnet) const {
+    return _ongoing_packet_ids[node_id][subnet];
 }
 
-MTAPacketDescriptor MTATrafficManagerInterface::GetPacketDescriptor(const int node_id) {
-    const int pid = GetPID(node_id);
+MTAPacketDescriptor MTATrafficManagerInterface::GetPacketDescriptor(const int node_id, const int subnet) {
+    const int pid = GetPID(node_id, subnet);
     return _unhandled_packets[node_id][pid];
 }
 
-bool MTATrafficManagerInterface::IsNodeBusy(const int node_id) const {
-    return (GetPID(node_id) != -1) ? true : false; 
+bool MTATrafficManagerInterface::IsNodeBusy(const int node_id, const int subnet) const {
+    return (GetPID(node_id, subnet) != -1) ? true : false;
 }
 
 void MTATrafficManagerInterface::Step() {
@@ -690,4 +705,8 @@ void MTATrafficManagerInterface::Step() {
 
 MTATrafficManager * MTATrafficManagerInterface::GetTrafficManager()  const {
     return _traffic_manager_p;
+}
+
+int MTATrafficManagerInterface::GetSubnetNum() const {
+    return _traffic_manager_p->_subnets;
 }

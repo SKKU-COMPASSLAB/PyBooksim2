@@ -149,19 +149,21 @@ private:
     MTATrafficManager *_traffic_manager_p;     // traffic manager
 
     vector<map<int, MTAPacketDescriptor>>   _unhandled_packets;
-    vector<int>                             _ongoing_packet_ids;
+    // vector<int>                             _ongoing_packet_ids;
+    vector<vector<int>>                     _ongoing_packet_ids;
 
 public:
     MTATrafficManagerInterface(const Configuration &config, const vector<Network *> &net);
     ~MTATrafficManagerInterface();
     int  SendPacket(const int src_id, const int dst_id, int subnet, MTAPacketDescriptor packet_desc);
-    void ReceivePacket(const int dst_id, const int pid);
-    void HandlePacket(const int node_id);
-    int  GetPID(const int node_id) const;
-    MTAPacketDescriptor GetPacketDescriptor(const int node_id);
-    bool IsNodeBusy(const int node_id) const;
+    void ReceivePacket(const int dst_id, const int pid, const int subnet);
+    void HandlePacket(const int node_id, const int subnet);
+    int  GetPID(const int node_id, const int subnet) const;
+    MTAPacketDescriptor GetPacketDescriptor(const int node_id, const int subnet);
+    bool IsNodeBusy(const int node_id, const int subnet) const;
     void Step();
     MTATrafficManager * GetTrafficManager()  const;
+    int GetSubnetNum() const;
 };
 
 #endif
