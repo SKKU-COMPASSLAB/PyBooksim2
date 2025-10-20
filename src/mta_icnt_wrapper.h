@@ -42,11 +42,8 @@ private:
     int _node_num;
     int _subnet_num;
 
-    // InterconnectCommand *_current_dispatched_cmd_p = NULL;
     std::vector<std::vector<std::vector<InterconnectCommand *>>> _cmd_dispatch_queue;
     std::map<int, InterconnectCommand *> _ongoing_icnt_cmd_map;
-
-    // std::vector<InterconnectCommand *> _suspended_cmds;
 
 public:
     InterconnectWrapper(BookSimConfig *config);
