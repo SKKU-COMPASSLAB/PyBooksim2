@@ -43,30 +43,6 @@ void InterconnectWrapper::cycle_step() {
     InterconnectCommand *cmd_p;
     int pid;
 
-    this->_icnt_p->Step();
-
-    for (int n = 0; n < this->_node_num; n++) {
-        for (int s = 0; s < this->_subnet_num; s++) {
-            if (this->_icnt_p->IsNodeBusy(n, s)) {
-                packet_desc = this->_icnt_p->GetPacketDescriptor(n, s);
-                pid = this->_icnt_p->GetPID(n, s);
-
-                cmd_p = this->_ongoing_icnt_cmd_map[pid];
-                cmd_p->is_received = true;
-
-                // Handle the received packet
-                this->_icnt_p->HandlePacket(n, s);
-                
-                this->_ongoing_icnt_cmd_map.erase(pid);
-                cmd_p->is_handled = true;
-
-                if (cmd_p->execute_callback) {
-                    cmd_p->execute_callback((void *)cmd_p);
-                }
-            }
-        }
-    }
-
     for (int n = 0; n < this->_node_num; n++) {
         for (int s = 0; s < this->_subnet_num; s++) {
             if (!this->_cmd_dispatch_queue[s][n].empty() && !this->_icnt_p->IsNodeBusy(n, s)) {
@@ -88,6 +64,30 @@ void InterconnectWrapper::cycle_step() {
 
                 if (cmd_p->dispatch_callback) {
                     cmd_p->dispatch_callback((void *)cmd_p);
+                }
+            }
+        }
+    }
+
+    this->_icnt_p->Step();
+
+    for (int n = 0; n < this->_node_num; n++) {
+        for (int s = 0; s < this->_subnet_num; s++) {
+            if (this->_icnt_p->IsNodeBusy(n, s)) {
+                packet_desc = this->_icnt_p->GetPacketDescriptor(n, s);
+                pid = this->_icnt_p->GetPID(n, s);
+
+                cmd_p = this->_ongoing_icnt_cmd_map[pid];
+                cmd_p->is_received = true;
+
+                // Handle the received packet
+                this->_icnt_p->HandlePacket(n, s);
+                
+                this->_ongoing_icnt_cmd_map.erase(pid);
+                cmd_p->is_handled = true;
+
+                if (cmd_p->execute_callback) {
+                    cmd_p->execute_callback((void *)cmd_p);
                 }
             }
         }
