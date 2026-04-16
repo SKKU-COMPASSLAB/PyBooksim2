@@ -21,3 +21,5 @@ pybooksim2/*.so
 pybooksim2/*.html
 
 build
+
+**/__pycache__/
