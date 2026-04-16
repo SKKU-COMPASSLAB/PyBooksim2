@@ -22,3 +22,6 @@ cdef extern from "py_interface.h":
 
     bint  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p, callback_t dispatch_callback, callback_t execute_callback) nogil
     void  pybooksim2_icnt_cycle_step(void *icnt_p) nogil
+    int   pybooksim2_get_icnt_router_count(void *icnt_p) nogil
+    long long pybooksim2_get_icnt_router_cmd_count(void *icnt_p, int router_id) nogil
+    double pybooksim2_get_icnt_router_avg_cycles(void *icnt_p, int router_id) nogil

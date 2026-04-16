@@ -26,7 +26,10 @@ from ._pybooksim2 cimport (
     pybooksim2_get_expected_cmd_cycles,
 
     pybooksim2_icnt_dispatch_cmd,
-    pybooksim2_icnt_cycle_step
+    pybooksim2_icnt_cycle_step,
+    pybooksim2_get_icnt_router_count,
+    pybooksim2_get_icnt_router_cmd_count,
+    pybooksim2_get_icnt_router_avg_cycles
 )
 
 
@@ -193,3 +196,23 @@ def icnt_cycle_step(icnt, int cycles):
     cdef void *icnt_p = PyCapsule_GetPointer(icnt, ICNT_CAPSULE_NAME)
     for _ in range(cycles):
         pybooksim2_icnt_cycle_step(icnt_p)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def get_icnt_router_stats(icnt):
+    cdef void *icnt_p = PyCapsule_GetPointer(icnt, ICNT_CAPSULE_NAME)
+    cdef int router_count = pybooksim2_get_icnt_router_count(icnt_p)
+    cdef int router_id
+    cdef long long cmd_count
+    cdef double avg_cycles
+
+    stats = {}
+    for router_id in range(router_count):
+        cmd_count = pybooksim2_get_icnt_router_cmd_count(icnt_p, router_id)
+        avg_cycles = pybooksim2_get_icnt_router_avg_cycles(icnt_p, router_id)
+        stats[router_id] = {
+            "cmd_count": int(cmd_count),
+            "avg_cycles": float(avg_cycles),
+        }
+
+    return stats

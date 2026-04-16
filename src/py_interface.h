@@ -32,6 +32,9 @@ int   pybooksim2_get_expected_cmd_cycles(void *cmd_p);
 
 char  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p, callback_t dispatch_callback, callback_t execute_callback);
 void  pybooksim2_icnt_cycle_step(void *icnt_p);
+int   pybooksim2_get_icnt_router_count(void *icnt_p);
+long long pybooksim2_get_icnt_router_cmd_count(void *icnt_p, int router_id);
+double pybooksim2_get_icnt_router_avg_cycles(void *icnt_p, int router_id);
 
 
 #endif

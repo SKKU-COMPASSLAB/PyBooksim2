@@ -49,7 +49,7 @@ void *pybooksim2_create_config_from_file(char *config_file) {
 void *pybooksim2_create_config_torus_2d(int subnets, int x, int y, int xr, int yr) {
     BookSimConfig *config = new BookSimConfig();
     config->Assign("topology", "torus");
-    config->Assign("routing_function", "dim_order");
+    config->Assign("routing_function", (x == y) ? "dim_order" : "dim_order_rect");
     config->Assign("subnets", subnets);
 
     config->Assign("x", x);
@@ -193,4 +193,19 @@ char  pybooksim2_icnt_dispatch_cmd(void *icnt_p, void *cmd_p, callback_t dispatc
 void  pybooksim2_icnt_cycle_step(void *icnt_p) {
     InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);
     icnt->cycle_step();
+}
+
+int pybooksim2_get_icnt_router_count(void *icnt_p) {
+    InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);
+    return icnt->get_router_count();
+}
+
+long long pybooksim2_get_icnt_router_cmd_count(void *icnt_p, int router_id) {
+    InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);
+    return static_cast<long long>(icnt->get_router_cmd_count(router_id));
+}
+
+double pybooksim2_get_icnt_router_avg_cycles(void *icnt_p, int router_id) {
+    InterconnectWrapper *icnt = static_cast<InterconnectWrapper *>(icnt_p);
+    return icnt->get_router_avg_cycles(router_id);
 }

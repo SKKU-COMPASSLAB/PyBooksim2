@@ -32,6 +32,7 @@
  */
 
 #include "booksim.hpp"
+#include <algorithm>
 #include <vector>
 #include <sstream>
 #include <ctime>
@@ -57,8 +58,28 @@ void KNCube::_ComputeSize( const Configuration &config )
   _k = config.GetInt( "k" );
   _n = config.GetInt( "n" );
 
+  _dim_size.assign(_n, _k);
+  _dim_stride.assign(_n, 1);
+
+  // For 2D torus/mesh, allow exact rectangular dimensions from x/y.
+  if(_n == 2) {
+    int x = config.GetInt("x");
+    int y = config.GetInt("y");
+    if((x > 0) && (y > 0)) {
+      _dim_size[0] = x;
+      _dim_size[1] = y;
+      _k = (_k > 0) ? _k : std::max(x, y);
+    }
+  }
+
+  int stride = 1;
+  for(int d = 0; d < _n; ++d) {
+    _dim_stride[d] = stride;
+    stride *= _dim_size[d];
+  }
+
   gK = _k; gN = _n;
-  _size     = powi( _k, _n );
+  _size     = stride;
   _channels = 2*_n*_size;
 
   _nodes = _size;
@@ -88,9 +109,9 @@ void KNCube::_BuildNet( const Configuration &config )
 
     router_name << "router";
     
-    if ( _k > 1 ) {
-      for ( int dim_offset = _size / _k; dim_offset >= 1; dim_offset /= _k ) {
-	router_name << "_" << ( node / dim_offset ) % _k;
+    if ( _n > 0 ) {
+      for ( int dim = _n - 1; dim >= 0; --dim ) {
+	router_name << "_" << ( node / _dim_stride[dim] ) % _dim_size[dim];
       }
     }
 
@@ -189,12 +210,13 @@ int KNCube::_RightChannel( int node, int dim )
 
 int KNCube::_LeftNode( int node, int dim )
 {
-  int k_to_dim = powi( _k, dim );
-  int loc_in_dim = ( node / k_to_dim ) % _k;
+  int k_to_dim = _dim_stride[dim];
+  int dim_size = _dim_size[dim];
+  int loc_in_dim = ( node / k_to_dim ) % dim_size;
   int left_node;
   // if at the left edge of the dimension, wraparound
   if ( loc_in_dim == 0 ) {
-    left_node = node + (_k-1)*k_to_dim;
+    left_node = node + (dim_size-1)*k_to_dim;
   } else {
     left_node = node - k_to_dim;
   }
@@ -204,12 +226,13 @@ int KNCube::_LeftNode( int node, int dim )
 
 int KNCube::_RightNode( int node, int dim )
 {
-  int k_to_dim = powi( _k, dim );
-  int loc_in_dim = ( node / k_to_dim ) % _k;
+  int k_to_dim = _dim_stride[dim];
+  int dim_size = _dim_size[dim];
+  int loc_in_dim = ( node / k_to_dim ) % dim_size;
   int right_node;
   // if at the right edge of the dimension, wraparound
-  if ( loc_in_dim == ( _k-1 ) ) {
-    right_node = node - (_k-1)*k_to_dim;
+  if ( loc_in_dim == ( dim_size-1 ) ) {
+    right_node = node - (dim_size-1)*k_to_dim;
   } else {
     right_node = node + k_to_dim;
   }
@@ -253,11 +276,11 @@ void KNCube::InsertRandomFaults( const Configuration &config )
       // edge test
       bool edge = false;
       for ( int n = 0; n < _n; ++n ) {
-	if ( ( ( node % _k ) == 0 ) ||
-	     ( ( node % _k ) == _k - 1 ) ) {
+  int coord = ( node / _dim_stride[n] ) % _dim_size[n];
+  if ( ( coord == 0 ) ||
+       ( coord == _dim_size[n] - 1 ) ) {
 	  edge = true;
 	}
-	node /= _k;
       }
 
       if ( edge ) {

@@ -1,6 +1,7 @@
 #ifndef __PYBOOKSIM_ICNT_WRAPPER_H
 #define __PYBOOKSIM_ICNT_WRAPPER_H
 
+#include <cstdint>
 #include <queue>
 #include <string>
 #include <map>
@@ -44,6 +45,12 @@ private:
 
     std::vector<std::vector<std::vector<InterconnectCommand *>>> _cmd_dispatch_queue;
     std::map<int, InterconnectCommand *> _ongoing_icnt_cmd_map;
+    std::map<int, uint64_t> _ongoing_icnt_cmd_issue_cycle_map;
+    uint64_t _cycle;
+
+    std::vector<uint64_t> _router_cmd_count;
+    std::vector<uint64_t> _router_total_cycles;
+    std::vector<int> _router_last_dst;
 
 public:
     InterconnectWrapper(BookSimConfig *config);
@@ -52,6 +59,9 @@ public:
     bool dispatch_command(InterconnectCommand *cmd_p);
     void cycle_step();
     MTATrafficManager *get_traffic_manager() const;
+    int get_router_count() const;
+    uint64_t get_router_cmd_count(int router_id) const;
+    double get_router_avg_cycles(int router_id) const;
 };
 
 

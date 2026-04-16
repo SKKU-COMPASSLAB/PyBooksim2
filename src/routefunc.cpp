@@ -58,6 +58,9 @@ map<string, tRoutingFunction> gRoutingFunctionMap;
 
 int gNumVCs;
 
+int gTorusRectX = -1;
+int gTorusRectY = -1;
+
 /* Add more functions here
  *
  */
@@ -1715,6 +1718,143 @@ void dim_order_bal_torus( const Router *r, const Flit *f, int in_channel,
 
 //=============================================================
 
+void dor_next_rect_torus( int cur, int dest, int in_port,
+                          int *out_port, int *partition,
+                          bool balance = false )
+{
+  const int x_size = (gTorusRectX > 0) ? gTorusRectX : gK;
+  const int y_size = (gTorusRectY > 0) ? gTorusRectY : gK;
+
+  const int cur_x = cur % x_size;
+  const int cur_y = cur / x_size;
+  const int dest_x = dest % x_size;
+  const int dest_y = dest / x_size;
+
+  int dim = -1;
+  int cur_coord = 0;
+  int dest_coord = 0;
+  int dim_size = 0;
+
+  if(cur_x != dest_x) {
+    dim = 0;
+    cur_coord = cur_x;
+    dest_coord = dest_x;
+    dim_size = x_size;
+  } else if(cur_y != dest_y) {
+    dim = 1;
+    cur_coord = cur_y;
+    dest_coord = dest_y;
+    dim_size = y_size;
+  }
+
+  if(dim < 0) {
+    *out_port = 2 * gN;
+    return;
+  }
+
+  if((in_port / 2) != dim) {
+    int dir;
+    int dist2 = dim_size - 2 * ((dest_coord - cur_coord + dim_size) % dim_size);
+
+    if((dist2 > 0) || ((dist2 == 0) && RandomInt(1))) {
+      *out_port = 2 * dim;
+      dir = 0;
+    } else {
+      *out_port = 2 * dim + 1;
+      dir = 1;
+    }
+
+    if(partition) {
+      if(balance) {
+        if(((dir == 0) && (cur_coord > dest_coord)) ||
+           ((dir == 1) && (cur_coord < dest_coord))) {
+          *partition = 1;
+        } else if(((dir == 0) && (cur_coord <= (dim_size - 1) / 2) && (dest_coord > (dim_size - 1) / 2)) ||
+                  ((dir == 1) && (cur_coord > (dim_size - 1) / 2) && (dest_coord <= (dim_size - 1) / 2))) {
+          *partition = 0;
+        } else {
+          *partition = RandomInt(1);
+        }
+      } else {
+        if(((dir == 0) && (cur_coord > dest_coord)) ||
+           ((dir == 1) && (dest_coord < cur_coord))) {
+          *partition = 1;
+        } else {
+          *partition = 0;
+        }
+      }
+    }
+  } else {
+    *out_port = in_port ^ 0x1;
+  }
+}
+
+//=============================================================
+
+void dim_order_rect_torus( const Router *r, const Flit *f, int in_channel,
+                           OutputSet *outputs, bool inject )
+{
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+
+    int cur  = r->GetID( );
+    int dest = f->dest;
+
+    dor_next_rect_torus( cur, dest, in_channel,
+                         &out_port, &f->ph, false );
+
+    if(cur != dest) {
+      int const available_vcs = (vcEnd - vcBegin + 1) / 2;
+      assert(available_vcs > 0);
+
+      if ( f->ph == 0 ) {
+        vcEnd -= available_vcs;
+      } else {
+        vcBegin += available_vcs;
+      }
+    }
+
+    if ( f->watch ) {
+      *gWatchOut << GetSimTime() << " | " << r->FullName() << " | "
+                 << "Adding VC range ["
+                 << vcBegin << ","
+                 << vcEnd << "]"
+                 << " at output port " << out_port
+                 << " for flit " << f->id
+                 << " (input port " << in_channel
+                 << ", destination " << f->dest << ")"
+                 << "." << endl;
+    }
+
+  }
+
+  outputs->Clear( );
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
+//=============================================================
+
 void min_adapt_torus( const Router *r, const Flit *f, int in_channel, OutputSet *outputs, bool inject )
 {
   int vcBegin = 0, vcEnd = gNumVCs-1;
@@ -1918,6 +2058,14 @@ void InitializeRoutingMap( const Configuration & config )
 {
 
   gNumVCs = config.GetInt( "num_vcs" );
+  gTorusRectX = config.GetInt("x");
+  gTorusRectY = config.GetInt("y");
+  if(gTorusRectX <= 0) {
+    gTorusRectX = config.GetInt("k");
+  }
+  if(gTorusRectY <= 0) {
+    gTorusRectY = config.GetInt("k");
+  }
 
   //
   // traffic class partitions
@@ -1974,6 +2122,7 @@ void InitializeRoutingMap( const Configuration & config )
   gRoutingFunctionMap["dim_order_ni_mesh"]  = &dim_order_ni_mesh;
   gRoutingFunctionMap["dim_order_pni_mesh"]  = &dim_order_pni_mesh;
   gRoutingFunctionMap["dim_order_torus"] = &dim_order_torus;
+  gRoutingFunctionMap["dim_order_rect_torus"] = &dim_order_rect_torus;
   gRoutingFunctionMap["dim_order_ni_torus"] = &dim_order_ni_torus;
   gRoutingFunctionMap["dim_order_bal_torus"] = &dim_order_bal_torus;
 

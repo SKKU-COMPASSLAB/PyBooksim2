@@ -28,6 +28,8 @@
 #ifndef _KNCUBE_HPP_
 #define _KNCUBE_HPP_
 
+#include <vector>
+
 #include "network.hpp"
 
 class KNCube : public Network {
@@ -36,6 +38,8 @@ class KNCube : public Network {
 
   int _k;
   int _n;
+  std::vector<int> _dim_size;
+  std::vector<int> _dim_stride;
 
   void _ComputeSize( const Configuration &config );
   void _BuildNet( const Configuration &config );
